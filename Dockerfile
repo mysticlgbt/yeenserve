@@ -10,4 +10,5 @@ FROM debian:buster-slim
 COPY --from=builder /usr/local/cargo/bin/yeenserve /usr/local/bin/yeenserve
 
 ENV ROCKET_ADDRESS="0.0.0.0"
+ENV YEENSERVE_PATH="/pics"
 CMD ["yeenserve"]
