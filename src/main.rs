@@ -1,16 +1,23 @@
 #[macro_use]
 extern crate rocket;
 
+use std::cell::Cell;
+use std::env;
 use std::fs;
 
 use rand::Rng;
+use rocket::{Config, State};
 use rocket::fs::NamedFile;
+
+struct YeenserveConfig {
+    path: String,
+}
 
 static EXTENSIONS: &'static [&str] = &["jpg", "jpeg", "png"];
 
 #[get("/")]
-async fn pic() -> Option<NamedFile> {
-    let all_entries = fs::read_dir("resources/").unwrap();
+async fn pic(config: &State<YeenserveConfig>) -> Option<NamedFile> {
+    let all_entries = fs::read_dir(config.path.as_str()).unwrap();
     let filtered_entries = all_entries.filter(|p| {
         let entry = p.as_ref().unwrap();
         let path = entry.path();
@@ -31,7 +38,21 @@ async fn pic() -> Option<NamedFile> {
     NamedFile::open(path.path().to_str().unwrap()).await.ok()
 }
 
+fn build_config() -> YeenserveConfig {
+    let mut path = String::from("resources/");
+    let path_env = std::env::var("YEENSERVE_PATH");
+    if path_env.is_ok() {
+        path = path_env.unwrap()
+    }
+
+    return YeenserveConfig {
+        path
+    }
+}
+
 #[rocket::main]
 async fn main() {
-    rocket::build().mount("/", routes![pic]).launch().await;
+    rocket::build().manage({
+        build_config()
+    }).mount("/", routes![pic]).launch().await;
 }
