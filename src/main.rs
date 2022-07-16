@@ -18,12 +18,11 @@ struct YeenserveConfig {
 // List of approved extensions.
 static EXTENSIONS: &'static [&str] = &["jpg", "jpeg", "png"];
 
-#[get("/")]
-async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<String>> {
+fn get_pictures(path: &str) -> Result<Vec<fs::DirEntry>, std::io::Error> {
     // Read all file entries from the pictures path.
-    let all_entries = fs::read_dir(config.path.as_str());
+    let all_entries = fs::read_dir(path);
     if all_entries.is_err() {
-        return Result::Err(NotFound(all_entries.err().unwrap().to_string()))
+        return Result::Err(all_entries.err().unwrap())
     }
     let all_entries = all_entries.unwrap();
 
@@ -44,13 +43,27 @@ async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<Str
     let collected_entries: Result<Vec<fs::DirEntry>, _> = filtered_entries.collect();
     let entries = collected_entries.unwrap();
 
-    if entries.len() == 0 {
+    return Result::Ok(entries);
+}
+
+#[get("/")]
+async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<String>> {
+    // Load list of pictures.
+    let pictures = get_pictures(config.path.as_str());
+    if pictures.is_err() {
+        return Result::Err(NotFound(String::from(pictures.err().unwrap().to_string())));
+    }
+    let pictures = pictures.unwrap();
+    let pictures_len = pictures.len();
+
+    // If there are no pictures, return a 404.
+    if pictures_len == 0 {
         return Result::Err(NotFound(String::from("Pictures directory empty.")))
     }
 
     // Generate a random number, and index the list of files we've collected.
     let random_num: u32 = { rand::thread_rng().gen::<u32>() };
-    let path: &fs::DirEntry = &entries[random_num as usize % entries.len()];
+    let path: &fs::DirEntry = &pictures[random_num as usize % pictures_len];
 
     // Return the selected file to the web server.
     let file = NamedFile::open(path.path().to_str().unwrap()).await.ok();
