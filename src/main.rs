@@ -17,6 +17,7 @@ struct YeenserveConfig {
 
 // List of approved extensions.
 static EXTENSIONS: &'static [&str] = &["jpg", "jpeg", "png"];
+static DEFAULT_PATH: &'static str = "resources/";
 
 fn get_pictures(path: &str) -> Result<Vec<fs::DirEntry>, std::io::Error> {
     // Read all file entries from the pictures path.
@@ -75,7 +76,7 @@ async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<Str
 }
 
 fn build_config() -> YeenserveConfig {
-    let mut path = String::from("resources/");
+    let mut path = String::from(DEFAULT_PATH);
     let path_env = env::var("YEENSERVE_PATH");
     if path_env.is_ok() {
         path = path_env.unwrap()
