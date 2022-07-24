@@ -23,7 +23,7 @@ fn get_pictures(path: &str) -> Result<Vec<fs::DirEntry>, std::io::Error> {
     // Read all file entries from the pictures path.
     let all_entries = fs::read_dir(path);
     if all_entries.is_err() {
-        return Result::Err(all_entries.err().unwrap())
+        return Err(all_entries.err().unwrap())
     }
     let all_entries = all_entries.unwrap();
 
@@ -44,7 +44,7 @@ fn get_pictures(path: &str) -> Result<Vec<fs::DirEntry>, std::io::Error> {
     let collected_entries: Result<Vec<fs::DirEntry>, _> = filtered_entries.collect();
     let entries = collected_entries.unwrap();
 
-    return Result::Ok(entries);
+    return Ok(entries);
 }
 
 #[get("/")]
@@ -52,14 +52,14 @@ async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<Str
     // Load list of pictures.
     let pictures = get_pictures(config.path.as_str());
     if pictures.is_err() {
-        return Result::Err(NotFound(String::from(pictures.err().unwrap().to_string())));
+        return Err(NotFound(String::from(pictures.err().unwrap().to_string())));
     }
     let pictures = pictures.unwrap();
     let pictures_len = pictures.len();
 
     // If there are no pictures, return a 404.
     if pictures_len == 0 {
-        return Result::Err(NotFound(String::from("Pictures directory empty.")))
+        return Err(NotFound("Pictures directory empty.".to_string()))
     }
 
     // Generate a random number, and index the list of files we've collected.
@@ -69,9 +69,9 @@ async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<Str
     // Return the selected file to the web server.
     let file = NamedFile::open(path.path().to_str().unwrap()).await.ok();
     return if file.is_some() {
-        Result::Ok(file.unwrap())
+        Ok(file.unwrap())
     } else {
-        Result::Err(NotFound(String::from("File not found.")))
+        Err(NotFound("File not found.".to_string()))
     }
 }
 
@@ -94,7 +94,7 @@ fn build_config() -> YeenserveConfig {
 
 #[rocket::main]
 async fn main() {
-    rocket::build().manage({
+    let _ = rocket::build().manage({
         build_config()
-    }).mount("/", routes![root]).launch().await;
+    }).mount("/", routes![root]).launch().await.expect("Rocket launch");
 }
