@@ -4,53 +4,32 @@ extern crate rocket;
 use std::env;
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 use rand::Rng;
-use rocket::State;
 use rocket::fs::NamedFile;
 use rocket::response::status::NotFound;
+use rocket::State;
+use crate::backend::base::Backend;
+
+mod backend;
 
 // Contains config for the application.
 struct YeenserveConfig {
-    path: String,
+    backend: &'static dyn backend::base::Backend
 }
 
-// List of approved extensions.
-static EXTENSIONS: &'static [&str] = &["jpg", "jpeg", "png"];
 static DEFAULT_PATH: &'static str = "resources/";
 
-fn get_pictures(path: &str) -> Result<Vec<fs::DirEntry>, std::io::Error> {
-    // Read all file entries from the pictures path.
-    let all_entries = fs::read_dir(path);
-    if all_entries.is_err() {
-        return Err(all_entries.err().unwrap());
-    }
-    let all_entries = all_entries.unwrap();
-
-    // Filter to contain only files with extensions contained in EXTENSIONS.
-    let filtered_entries = all_entries.filter(|p| {
-        let entry = p.as_ref().unwrap();
-        let path = entry.path();
-        let ext = path.extension();
-        if ext.is_none() {
-            return false;
-        }
-        let ext_str = ext.unwrap().to_str().unwrap();
-        let is_valid_ext = EXTENSIONS.contains(&ext_str);
-        p.is_ok() && entry.file_type().unwrap().is_file() && is_valid_ext
-    });
-
-    // Collect all of the files.
-    let collected_entries: Result<Vec<fs::DirEntry>, _> = filtered_entries.collect();
-    let entries = collected_entries.unwrap();
-
-    return Ok(entries);
+fn list_files() -> Result<Vec<fs::DirEntry>, std::io::Error> {
+    return Ok(Vec::new());
 }
 
 #[get("/")]
 async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<String>> {
     // Load list of pictures.
-    let pictures = get_pictures(config.path.as_str());
+    //let pictures = get_pictures(config.path.as_str());
+    let pictures = list_files();
     if pictures.is_err() {
         return Err(NotFound(String::from(pictures.err().unwrap().to_string())));
     }
@@ -87,8 +66,13 @@ fn build_config() -> YeenserveConfig {
         panic!("Path {} is not a directory!", path.as_str());
     }
 
-    return YeenserveConfig {
+    /*let be = backend::file::FileBackend {
         path
+    };*/
+    let be = crate::backend::file::create();
+
+    return YeenserveConfig {
+        backend: be as &dyn Backend
     };
 }
 
