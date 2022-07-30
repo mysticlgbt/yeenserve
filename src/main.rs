@@ -23,7 +23,7 @@ fn get_pictures(path: &str) -> Result<Vec<fs::DirEntry>, std::io::Error> {
     // Read all file entries from the pictures path.
     let all_entries = fs::read_dir(path);
     if all_entries.is_err() {
-        return Err(all_entries.err().unwrap())
+        return Err(all_entries.err().unwrap());
     }
     let all_entries = all_entries.unwrap();
 
@@ -59,7 +59,7 @@ async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<Str
 
     // If there are no pictures, return a 404.
     if pictures_len == 0 {
-        return Err(NotFound("Pictures directory empty.".to_string()))
+        return Err(NotFound("Pictures directory empty.".to_string()));
     }
 
     // Generate a random number, and index the list of files we've collected.
@@ -72,7 +72,7 @@ async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<Str
         Ok(file.unwrap())
     } else {
         Err(NotFound("File not found.".to_string()))
-    }
+    };
 }
 
 fn build_config() -> YeenserveConfig {
@@ -89,7 +89,7 @@ fn build_config() -> YeenserveConfig {
 
     return YeenserveConfig {
         path
-    }
+    };
 }
 
 #[rocket::main]
