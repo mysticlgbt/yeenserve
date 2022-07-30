@@ -6,13 +6,13 @@ use crate::backend::base::{Backend, EXTENSIONS};
 
 #[derive(Clone)]
 pub struct FileBackend {
-    path: &'static str
+    path: String
 }
 
 impl Backend for FileBackend {
     fn list_files(&self) -> Result<Vec<String>, std::io::Error> {
         // Read all file entries from the pictures path.
-        let all_entries = fs::read_dir(self.path);
+        let all_entries = fs::read_dir(self.path.as_str());
         if all_entries.is_err() {
             return Err(all_entries.err().unwrap());
         }
@@ -38,7 +38,7 @@ impl Backend for FileBackend {
                 Some(path_str)
             } else {
                 None
-            }
+            };
         });
 
         // Collect all of the files.
@@ -51,9 +51,8 @@ impl Backend for FileBackend {
     }
 }
 
-pub fn create(path: &str) -> &'static FileBackend {
-    static backend: FileBackend = FileBackend {
+pub fn create(path: String) -> Box<FileBackend> {
+    return Box::new(FileBackend {
         path
-    };
-    return &backend;
+    });
 }

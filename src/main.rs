@@ -16,7 +16,7 @@ mod backend;
 
 // Contains config for the application.
 struct YeenserveConfig {
-    backend: &'static dyn backend::base::Backend
+    backend: Box<dyn backend::base::Backend>
 }
 
 static DEFAULT_PATH: &'static str = "resources/";
@@ -66,13 +66,10 @@ fn build_config() -> YeenserveConfig {
         panic!("Path {} is not a directory!", path.as_str());
     }
 
-    /*let be = backend::file::FileBackend {
-        path
-    };*/
-    let be = crate::backend::file::create();
+    let be = crate::backend::file::create(path);
 
     return YeenserveConfig {
-        backend: be as &dyn Backend
+        backend: be
     };
 }
 
