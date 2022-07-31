@@ -1,12 +1,12 @@
 use std::fs;
-use std::fs::canonicalize;
 use std::io::Error;
+use std::path::Path;
 
 use crate::backend::base::{Backend, EXTENSIONS};
 
 #[derive(Clone)]
 pub struct FileBackend {
-    path: String
+    path: String,
 }
 
 impl Backend for FileBackend {
@@ -31,11 +31,10 @@ impl Backend for FileBackend {
             let allow = p.is_ok() && entry.file_type().unwrap().is_file() && is_valid_ext;
 
             return if allow {
+                // TODO: Better error handling.
                 let path = p.unwrap().path();
-                let abs_path = canonicalize(path).unwrap();
-                let path_str = abs_path.to_str().unwrap().to_string();
-
-                Some(path_str)
+                let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
+                Some(file_name)
             } else {
                 None
             };
@@ -46,8 +45,11 @@ impl Backend for FileBackend {
         return Ok(entries);
     }
 
-    fn get_file_contents(&self) -> Result<&[u8], Error> {
-        todo!()
+    fn get_file_contents(&self, file: &str) -> Result<Vec<u8>, Error> {
+        let base = Path::new(&self.path);
+        let file = Path::new(file);
+        let path = base.join(file);
+        return fs::read(path);
     }
 }
 

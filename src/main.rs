@@ -5,20 +5,34 @@ use std::env;
 use std::path::Path;
 
 use rand::Rng;
+use rocket::{Request, response, Response, State};
+use rocket::response::Responder;
 use rocket::response::status::NotFound;
-use rocket::State;
 
 mod backend;
 
 // Contains config for the application.
 struct YeenserveConfig {
-    backend: Box<dyn backend::base::Backend>
+    backend: Box<dyn backend::base::Backend>,
 }
 
 static DEFAULT_PATH: &'static str = "resources/";
 
+struct Image {
+    data: Vec<u8>,
+    content_type: &'static str,
+}
+
+impl<'r> Responder<'r, 'static> for Image {
+    fn respond_to(self, req: &'r Request<'_>) -> response::Result<'static> {
+        Response::build_from(self.data.respond_to(req)?)
+            .raw_header("Content-Type", self.content_type)
+            .ok()
+    }
+}
+
 #[get("/")]
-async fn root(config: &State<YeenserveConfig>) -> Result<String, NotFound<String>> {
+async fn root(config: &State<YeenserveConfig>) -> Result<Image, NotFound<String>> {
     // Load list of pictures.
     let pictures = config.backend.list_files();
     if pictures.is_err() {
@@ -34,12 +48,21 @@ async fn root(config: &State<YeenserveConfig>) -> Result<String, NotFound<String
 
     // Generate a random number, and index the list of files we've collected.
     let random_num: u32 = { rand::thread_rng().gen::<u32>() };
-    let path: &String = &pictures[random_num as usize % pictures_len];
+    let name: &String = &pictures[random_num as usize % pictures_len];
 
     // Return the selected file to the web server.
-    //let file = NamedFile::open(path.path().to_str().unwrap()).await.ok();
-    return if true {
-        Ok(path.clone())
+    let data = config.backend.get_file_contents(name);
+    return if data.is_ok() {
+        let path = Path::new(name);
+        let ext = path.extension().unwrap().to_str().unwrap();
+        let ext = match ext {
+            "jpg" => "image/jpeg",
+            "jpeg" => "image/jpeg",
+            "png" => "image/png",
+            _ => return Err(NotFound("Extension missing.".to_string()))
+        };
+
+        Ok(Image { data: data.unwrap(), content_type: ext })
     } else {
         Err(NotFound("File not found.".to_string()))
     };
