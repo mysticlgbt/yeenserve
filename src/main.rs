@@ -2,15 +2,11 @@
 extern crate rocket;
 
 use std::env;
-use std::fs;
 use std::path::Path;
-use std::sync::Arc;
 
 use rand::Rng;
-use rocket::fs::NamedFile;
 use rocket::response::status::NotFound;
 use rocket::State;
-use crate::backend::base::Backend;
 
 mod backend;
 
@@ -21,15 +17,10 @@ struct YeenserveConfig {
 
 static DEFAULT_PATH: &'static str = "resources/";
 
-fn list_files() -> Result<Vec<fs::DirEntry>, std::io::Error> {
-    return Ok(Vec::new());
-}
-
 #[get("/")]
-async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<String>> {
+async fn root(config: &State<YeenserveConfig>) -> Result<String, NotFound<String>> {
     // Load list of pictures.
-    //let pictures = get_pictures(config.path.as_str());
-    let pictures = list_files();
+    let pictures = config.backend.list_files();
     if pictures.is_err() {
         return Err(NotFound(String::from(pictures.err().unwrap().to_string())));
     }
@@ -43,12 +34,12 @@ async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<Str
 
     // Generate a random number, and index the list of files we've collected.
     let random_num: u32 = { rand::thread_rng().gen::<u32>() };
-    let path: &fs::DirEntry = &pictures[random_num as usize % pictures_len];
+    let path: &String = &pictures[random_num as usize % pictures_len];
 
     // Return the selected file to the web server.
-    let file = NamedFile::open(path.path().to_str().unwrap()).await.ok();
-    return if file.is_some() {
-        Ok(file.unwrap())
+    //let file = NamedFile::open(path.path().to_str().unwrap()).await.ok();
+    return if true {
+        Ok(path.clone())
     } else {
         Err(NotFound("File not found.".to_string()))
     };
