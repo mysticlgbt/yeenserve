@@ -6,7 +6,7 @@ use std::path::Path;
 
 use rand::Rng;
 use rocket::{Request, response, Response, State};
-use rocket::response::Responder;
+use rocket::response::{content, Responder};
 use rocket::response::status::NotFound;
 
 mod backend;
@@ -32,7 +32,7 @@ impl<'r> Responder<'r, 'static> for Image {
 }
 
 #[get("/")]
-async fn root(config: &State<YeenserveConfig>) -> Result<Image, NotFound<String>> {
+async fn root(config: &State<YeenserveConfig>) -> Result<content::RawHtml<String>, NotFound<String>> {
     // Load list of pictures.
     let pictures = config.backend.list_files();
     if pictures.is_err() {
@@ -50,10 +50,18 @@ async fn root(config: &State<YeenserveConfig>) -> Result<Image, NotFound<String>
     let random_num: u32 = { rand::thread_rng().gen::<u32>() };
     let name: &String = &pictures[random_num as usize % pictures_len];
 
-    // Return the selected file to the web server.
-    let data = config.backend.get_file_contents(name);
+    let html = String::from(format!("<img style=\"display: block; user-select: none; margin: auto;
+        background-color: rgb(230, 230, 230); width: 100%\"
+    src=\"/pics/{}\" />", name));
+
+    return Ok(content::RawHtml(html));
+}
+
+#[get("/pics/<path>")]
+async fn pics(path: &str, config: &State<YeenserveConfig>) -> Result<Image, NotFound<String>> {
+    let data = config.backend.get_file_contents(path);
     return if data.is_ok() {
-        let path = Path::new(name);
+        let path = Path::new(path);
         let ext = path.extension().unwrap().to_str().unwrap();
         let ext = match ext {
             "jpg" => "image/jpeg",
@@ -91,5 +99,8 @@ fn build_config() -> YeenserveConfig {
 async fn main() {
     let _ = rocket::build().manage({
         build_config()
-    }).mount("/", routes![root]).launch().await.expect("Rocket launch");
+    }).mount("/", routes![
+        root,
+        pics
+    ]).launch().await.expect("Rocket launch");
 }
