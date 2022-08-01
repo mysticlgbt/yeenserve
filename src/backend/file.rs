@@ -1,8 +1,10 @@
-use std::{error, fs};
+use std::{env, error, fs};
 use std::io::Error;
 use std::path::Path;
 
 use crate::backend::base::{Backend, EXTENSIONS};
+
+static DEFAULT_PATH: &'static str = "resources/";
 
 #[derive(Clone)]
 pub struct FileBackend {
@@ -53,7 +55,18 @@ impl Backend for FileBackend {
     }
 }
 
-pub fn create(path: String) -> Result<Box<dyn Backend>, Box<dyn error::Error>> {
+pub fn create() -> Result<Box<dyn Backend>, Box<dyn error::Error>> {
+    let mut path = String::from(DEFAULT_PATH);
+    let path_env = env::var("YEENSERVE_PATH");
+    if path_env.is_ok() {
+        path = path_env.unwrap()
+    }
+
+    // Validate that the pictures path exists.
+    if !Path::new(path.as_str()).is_dir() {
+        panic!("Path {} is not a directory!", path.as_str());
+    }
+
     return Ok(Box::new(FileBackend {
         path
     }));

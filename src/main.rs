@@ -16,8 +16,6 @@ struct YeenserveConfig {
     backend: Box<dyn backend::base::Backend>,
 }
 
-static DEFAULT_PATH: &'static str = "resources/";
-
 struct Image {
     data: Vec<u8>,
     content_type: &'static str,
@@ -77,20 +75,9 @@ async fn pics(path: &str, config: &State<YeenserveConfig>) -> Result<Image, NotF
 }
 
 fn build_config() -> YeenserveConfig {
-    let mut path = String::from(DEFAULT_PATH);
-    let path_env = env::var("YEENSERVE_PATH");
-    if path_env.is_ok() {
-        path = path_env.unwrap()
-    }
-
-    // Validate that the pictures path exists.
-    if !Path::new(path.as_str()).is_dir() {
-        panic!("Path {} is not a directory!", path.as_str());
-    }
-
-    let backend_type = std::env::var("YEENSERVE_BACKEND");
+    let backend_type = env::var("YEENSERVE_BACKEND");
     let backend = match backend_type.unwrap_or("file".to_string()).as_str() {
-        "file" => crate::backend::file::create(path),
+        "file" => crate::backend::file::create(),
         "s3" => crate::backend::s3::create(),
         _ => panic!("invalid backend type"),
     };
