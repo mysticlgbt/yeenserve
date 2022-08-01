@@ -2,55 +2,37 @@
 extern crate rocket;
 
 use std::env;
-use std::fs;
 use std::path::Path;
 
 use rand::Rng;
-use rocket::State;
-use rocket::fs::NamedFile;
+use rocket::{Request, response, Response, State};
+use rocket::response::{content, Responder};
 use rocket::response::status::NotFound;
+
+mod backend;
 
 // Contains config for the application.
 struct YeenserveConfig {
-    path: String,
+    backend: Box<dyn backend::base::Backend>,
 }
 
-// List of approved extensions.
-static EXTENSIONS: &'static [&str] = &["jpg", "jpeg", "png"];
-static DEFAULT_PATH: &'static str = "resources/";
+struct Image {
+    data: Vec<u8>,
+    content_type: &'static str,
+}
 
-fn get_pictures(path: &str) -> Result<Vec<fs::DirEntry>, std::io::Error> {
-    // Read all file entries from the pictures path.
-    let all_entries = fs::read_dir(path);
-    if all_entries.is_err() {
-        return Err(all_entries.err().unwrap())
+impl<'r> Responder<'r, 'static> for Image {
+    fn respond_to(self, req: &'r Request<'_>) -> response::Result<'static> {
+        Response::build_from(self.data.respond_to(req)?)
+            .raw_header("Content-Type", self.content_type)
+            .ok()
     }
-    let all_entries = all_entries.unwrap();
-
-    // Filter to contain only files with extensions contained in EXTENSIONS.
-    let filtered_entries = all_entries.filter(|p| {
-        let entry = p.as_ref().unwrap();
-        let path = entry.path();
-        let ext = path.extension();
-        if ext.is_none() {
-            return false;
-        }
-        let ext_str = ext.unwrap().to_str().unwrap();
-        let is_valid_ext = EXTENSIONS.contains(&ext_str);
-        p.is_ok() && entry.file_type().unwrap().is_file() && is_valid_ext
-    });
-
-    // Collect all of the files.
-    let collected_entries: Result<Vec<fs::DirEntry>, _> = filtered_entries.collect();
-    let entries = collected_entries.unwrap();
-
-    return Ok(entries);
 }
 
 #[get("/")]
-async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<String>> {
+async fn root(config: &State<YeenserveConfig>) -> Result<content::RawHtml<String>, NotFound<String>> {
     // Load list of pictures.
-    let pictures = get_pictures(config.path.as_str());
+    let pictures = config.backend.list_files();
     if pictures.is_err() {
         return Err(NotFound(String::from(pictures.err().unwrap().to_string())));
     }
@@ -59,42 +41,61 @@ async fn root(config: &State<YeenserveConfig>) -> Result<NamedFile, NotFound<Str
 
     // If there are no pictures, return a 404.
     if pictures_len == 0 {
-        return Err(NotFound("Pictures directory empty.".to_string()))
+        return Err(NotFound("Pictures directory empty.".to_string()));
     }
 
     // Generate a random number, and index the list of files we've collected.
     let random_num: u32 = { rand::thread_rng().gen::<u32>() };
-    let path: &fs::DirEntry = &pictures[random_num as usize % pictures_len];
+    let name: &String = &pictures[random_num as usize % pictures_len];
 
-    // Return the selected file to the web server.
-    let file = NamedFile::open(path.path().to_str().unwrap()).await.ok();
-    return if file.is_some() {
-        Ok(file.unwrap())
+    let html = String::from(format!("<img style=\"display: block; user-select: none; margin: auto;
+        background-color: rgb(230, 230, 230); width: 100%\"
+    src=\"/pics/{}\" />", name));
+
+    return Ok(content::RawHtml(html));
+}
+
+#[get("/pics/<path>")]
+async fn pics(path: &str, config: &State<YeenserveConfig>) -> Result<Image, NotFound<String>> {
+    let data = config.backend.get_file_contents(path);
+    return if data.is_ok() {
+        let path = Path::new(path);
+        let ext = path.extension().unwrap().to_str().unwrap();
+        let ext = match ext {
+            "jpg" => "image/jpeg",
+            "jpeg" => "image/jpeg",
+            "png" => "image/png",
+            _ => return Err(NotFound("Extension missing.".to_string()))
+        };
+
+        Ok(Image { data: data.unwrap(), content_type: ext })
     } else {
         Err(NotFound("File not found.".to_string()))
-    }
+    };
 }
 
 fn build_config() -> YeenserveConfig {
-    let mut path = String::from(DEFAULT_PATH);
-    let path_env = env::var("YEENSERVE_PATH");
-    if path_env.is_ok() {
-        path = path_env.unwrap()
-    }
-
-    // Validate that the pictures path exists.
-    if !Path::new(path.as_str()).is_dir() {
-        panic!("Path {} is not a directory!", path.as_str());
+    let backend_type = env::var("YEENSERVE_BACKEND");
+    let backend = match backend_type.unwrap_or("file".to_string()).as_str() {
+        "file" => crate::backend::file::create(),
+        "s3" => crate::backend::s3::create(),
+        _ => panic!("invalid backend type"),
+    };
+    if backend.is_err() {
+        panic!("failed to initialize backend");
     }
 
     return YeenserveConfig {
-        path
-    }
+        backend: backend.unwrap()
+    };
 }
 
 #[rocket::main]
 async fn main() {
     let _ = rocket::build().manage({
         build_config()
-    }).mount("/", routes![root]).launch().await.expect("Rocket launch");
+    }).mount("/", routes![
+        root,
+        pics
+    ]).launch().await.expect("Rocket launch");
 }

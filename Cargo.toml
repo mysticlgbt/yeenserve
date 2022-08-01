@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 rand = "0.8.5"
 rocket = "0.5.0-rc.2"
+rust-s3 = "0.32.3"
 
 [[bin]]
 name = "yeenserve"
