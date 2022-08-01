@@ -1,4 +1,4 @@
-use std::fs;
+use std::{error, fs};
 use std::io::Error;
 use std::path::Path;
 
@@ -53,8 +53,8 @@ impl Backend for FileBackend {
     }
 }
 
-pub fn create(path: String) -> Box<FileBackend> {
-    return Box::new(FileBackend {
+pub fn create(path: String) -> Result<Box<dyn Backend>, Box<dyn error::Error>> {
+    return Ok(Box::new(FileBackend {
         path
-    });
+    }));
 }

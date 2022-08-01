@@ -88,10 +88,18 @@ fn build_config() -> YeenserveConfig {
         panic!("Path {} is not a directory!", path.as_str());
     }
 
-    let be = crate::backend::file::create(path);
+    let backend_type = std::env::var("YEENSERVE_BACKEND");
+    let backend = match backend_type.unwrap_or("file".to_string()).as_str() {
+        "file" => crate::backend::file::create(path),
+        "s3" => crate::backend::s3::create(),
+        _ => panic!("invalid backend type"),
+    };
+    if backend.is_err() {
+        panic!("failed to initialize backend");
+    }
 
     return YeenserveConfig {
-        backend: be
+        backend: backend.unwrap()
     };
 }
 
